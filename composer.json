@@ -1,0 +1,56 @@
+{
+    "name": "puff/http-server",
+    "description": "HTTP web application orchestration for PHP Unison Fiber Framework",
+    "type": "library",
+    "keywords": [
+        "php",
+        "web-server",
+        "http-server",
+        "fiber",
+        "routing",
+        "puff"
+    ],
+    "license": "MIT",
+    "require": {
+        "puff/application": "dev-main",
+        "puff/async": "dev-main",
+        "puff/http": "dev-main",
+        "puff/pipeline": "dev-main",
+        "puff/routing": "dev-main",
+        "puff/server": "dev-main",
+        "php": "^8.2",
+        "psr/http-message": "^2.0",
+        "psr/http-server-handler": "^1.0"
+    },
+    "require-dev": {
+        "puff/config": "dev-main",
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Puff\\HttpServer\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Puff\\HttpServer\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "puff": {
+            "config": {"http.server.php": "config/http.server.php"},
+            "apps": [
+                "Puff\\HttpServer\\ServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit tests"
+    }
+}
