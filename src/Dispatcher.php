@@ -16,6 +16,7 @@ use Puff\Http\Exception\HttpException;
 use Puff\Http\Request;
 use Puff\Http\Response;
 use Puff\Pipeline\Pipeline;
+use Puff\Routing\Exception\MethodNotAllowedException;
 use Puff\Routing\RouteCollection;
 use Puff\Routing\Router;
 
@@ -58,17 +59,15 @@ final class Dispatcher
         $container = $this->app->container();
         return $container->make('router')->through($this->routes, function ($route) use ($container, $context): mixed {
             $request = $container->make('request');
-            if ($request instanceof Request && \is_string($route->lang) && $route->lang !== '') {
-                $request = $request->withAttribute('locale', $route->lang);
+            $locale = $route->locale();
+            if ($request instanceof Request && $locale !== null && $locale !== '') {
+                $request = $request->withAttribute('locale', $locale);
                 $container->scopedInstance('request', $request);
             }
 
             return (new Pipeline($container))
                 ->send($request)
-                ->through(\array_values(\array_unique([
-                    ...$this->pipeline,
-                    ...$route->pipeline,
-                ])))
+                ->through(self::pipelines(\array_merge($this->pipeline, $route->pipeline())))
                 ->then(fn (): mixed => $container->call($route->callable(), $route->args() + $context));
         });
     }
@@ -89,10 +88,13 @@ final class Dispatcher
         } catch (HttpException $exception) {
             $status = $exception->status();
             $message = $exception->getMessage() ?: Response::reason($status);
-            if ($request->accept('application/json')) {
-                return $response->json(['code' => $status, 'message' => $message], $status);
+            $result = $request->accept('application/json')
+                ? $response->json(['code' => $status, 'message' => $message], $status)
+                : $response->html(\htmlspecialchars($message, ENT_QUOTES, 'UTF-8'), $status);
+            if ($exception instanceof MethodNotAllowedException && $exception->allowed() !== []) {
+                return $result->withHeader('Allow', \implode(', ', $exception->allowed()));
             }
-            return $response->html(\htmlspecialchars($message, ENT_QUOTES, 'UTF-8'), $status);
+            return $result;
         } finally {
             $container->clearScope();
         }
@@ -102,5 +104,24 @@ final class Dispatcher
     public function routes(): array
     {
         return $this->routes;
+    }
+
+    /**
+     * @param  array<array-key, string|object> $pipeline
+     * @return list<string|object>
+     */
+    private static function pipelines(array $pipeline): array
+    {
+        $unique = [];
+        $result = [];
+        foreach ($pipeline as $stage) {
+            $key = \is_object($stage) ? 'object:' . \spl_object_id($stage) : 'string:' . $stage;
+            if (isset($unique[$key])) {
+                continue;
+            }
+            $unique[$key] = true;
+            $result[] = $stage;
+        }
+        return $result;
     }
 }
