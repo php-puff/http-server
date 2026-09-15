@@ -36,6 +36,7 @@ final class Server implements TcpInterface
     private array $config;
     private TcpServer $tcp;
     private TrustedProxy $trustedProxy;
+    private Resource $resource;
 
     /** @param array<string, mixed> $config */
     public function __construct(
@@ -55,6 +56,7 @@ final class Server implements TcpInterface
         ], $config);
         $this->handler = $handler;
         $this->scheduler = $scheduler ?? new FiberScheduler();
+        $this->resource = new Resource($this->config);
         $this->trustedProxy = new TrustedProxy(\array_values(\array_filter(
             (array) $this->config['trusted_proxies'],
             'is_string',
@@ -126,7 +128,7 @@ final class Server implements TcpInterface
 
         $this->scheduler->async(function () use ($connection, $request, $keepAlive, $temporaryFiles): void {
             try {
-                $response = $this->handler->handle($request);
+                $response = $this->resource->handle($request) ?? $this->handler->handle($request);
                 $this->queueResponse($connection, $response, !$keepAlive);
             } catch (Throwable $exception) {
                 $this->queueRawResponse($connection, 500, 'Internal Server Error', !$keepAlive);
@@ -360,7 +362,7 @@ final class Server implements TcpInterface
         $reason = $response->getReasonPhrase() ?: 'Unknown';
         $body = (string) $response->getBody();
         $headers = $response->getHeaders();
-        $headers['Content-Length'] = [(string) \strlen($body)];
+        $headers['Content-Length'] ??= [(string) \strlen($body)];
         $headers['Connection'] = [$close ? 'close' : 'keep-alive'];
 
         $lines = ["HTTP/1.1 {$status} {$reason}"];

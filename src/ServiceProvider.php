@@ -23,6 +23,9 @@ final class ServiceProvider implements Contract
     /** @var list<Server> */
     private array $servers = [];
 
+    /** @var list<Resource> */
+    private array $resources = [];
+
     private ?int $workers = null;
 
     public function name(): string
@@ -34,6 +37,7 @@ final class ServiceProvider implements Contract
     {
         $this->dispatchers = [];
         $this->servers = [];
+        $this->resources = [];
         $this->workers = null;
         $config = $app->container()->make('config');
         $workers = $config->get('workers', 1);
@@ -51,6 +55,7 @@ final class ServiceProvider implements Contract
             ));
             $dispatcher = new Dispatcher($app, $routes, $pipeline);
             $this->dispatchers[] = $dispatcher;
+            $this->resources[] = new Resource($server);
             $this->servers[] = new Server(new Handler($dispatcher), $server);
             $this->setWorkers($server['workers']);
         }
@@ -102,12 +107,12 @@ final class ServiceProvider implements Contract
             if (\count($this->dispatchers) !== 1) {
                 throw new \LogicException('PHP-FPM requires PUFF_SERVER_ADDR when multiple HTTP servers are configured.');
             }
-            return $this->dispatcher()->handle($request);
+            return $this->resources[0]->handle($request) ?? $this->dispatcher()->handle($request);
         }
         $address = (string) \Puff\Server\Endpoint::parse($address);
         foreach ($this->servers as $index => $server) {
             if ($server->address() === $address) {
-                return $this->dispatchers[$index]->handle($request);
+                return $this->resources[$index]->handle($request) ?? $this->dispatchers[$index]->handle($request);
             }
         }
         throw new \LogicException("HTTP server [{$address}] is not configured.");
