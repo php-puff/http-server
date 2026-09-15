@@ -29,7 +29,12 @@ final class ServiceProviderTest extends TestCase
     public function testUsesSharedApplicationConfigAndContainer(): void
     {
         $config = new Config([
-            'http' => ['server' => ['workers' => 3, 'routes' => []]],
+            'server' => [[
+                'type' => 'http',
+                'addr' => '127.0.0.1:8620',
+                'workers' => 3,
+                'routes' => [],
+            ]],
         ]);
         $container = new Container();
         $container->instance(Config::class, $config);
@@ -48,7 +53,11 @@ final class ServiceProviderTest extends TestCase
     public function testMissingRouteReturnsNotFoundResponse(): void
     {
         $config = new Config([
-            'http' => ['server' => ['routes' => []]],
+            'server' => [[
+                'type' => 'http',
+                'addr' => '127.0.0.1:8620',
+                'routes' => [],
+            ]],
         ]);
         $container = new Container();
         $container->instance(Config::class, $config);
@@ -60,5 +69,23 @@ final class ServiceProviderTest extends TestCase
 
         self::assertSame(404, $response->getStatusCode());
         self::assertStringContainsString('Invalid Request Route', (string) $response->getBody());
+    }
+
+    public function testLoadsMultipleHttpServersFromOneConfiguration(): void
+    {
+        $config = new Config([
+            'server' => [
+                ['type' => 'http', 'addr' => '127.0.0.1:8620', 'workers' => 2, 'routes' => []],
+                ['type' => 'http', 'addr' => '127.0.0.1:8621', 'workers' => 2, 'routes' => []],
+            ],
+        ]);
+        $container = new Container();
+        $container->instance(Config::class, $config);
+        $container->instance('config', $config);
+        $app = new Application($container);
+        $web = $app->container()->make(ServiceProvider::class);
+
+        self::assertSame(2, $web->workers());
+        self::assertSame('127.0.0.1:8620, 127.0.0.1:8621', $web->info()['addr']);
     }
 }

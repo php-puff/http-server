@@ -8,16 +8,17 @@ use Puff\HttpServer\ServiceProvider;
 $provider = make(ServiceProvider::class);
 ```
 
-The package publishes `config/http.server.php`; its values are available under `http.server`:
+HTTP instances are read from the shared `config/server.php` list. Each item with `type: 'http'` starts a listener:
 
 ```php
-'http' => [
-    'server' => [
-        'addr' => '127.0.0.1:8620',
-        'routes' => [dirname(__DIR__) . '/app/routes.php'],
-        'pipeline' => [],
-        'workers' => 1,
-        'trusted_proxies' => [],
-    ],
+[
+    'type' => 'http',
+    'addr' => '127.0.0.1:8620',
+    'routes' => [dirname(__DIR__) . '/app/routes.php'],
+    'pipeline' => [],
+    'workers' => 1,
+    'trusted_proxies' => [],
 ],
 ```
+
+Multiple HTTP listeners are supported. All HTTP items share one Application process group, so they must use the same `workers` value.
