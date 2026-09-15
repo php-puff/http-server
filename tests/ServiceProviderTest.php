@@ -29,10 +29,10 @@ final class ServiceProviderTest extends TestCase
     public function testUsesSharedApplicationConfigAndContainer(): void
     {
         $config = new Config([
+            'workers' => 3,
             'server' => [[
                 'type' => 'http',
                 'addr' => '127.0.0.1:8620',
-                'workers' => 3,
                 'routes' => [],
             ]],
         ]);
@@ -53,6 +53,7 @@ final class ServiceProviderTest extends TestCase
     public function testMissingRouteReturnsNotFoundResponse(): void
     {
         $config = new Config([
+            'workers' => 1,
             'server' => [[
                 'type' => 'http',
                 'addr' => '127.0.0.1:8620',
@@ -74,9 +75,10 @@ final class ServiceProviderTest extends TestCase
     public function testLoadsMultipleHttpServersFromOneConfiguration(): void
     {
         $config = new Config([
+            'workers' => 2,
             'server' => [
-                ['type' => 'http', 'addr' => '127.0.0.1:8620', 'workers' => 2, 'routes' => []],
-                ['type' => 'http', 'addr' => '127.0.0.1:8621', 'workers' => 2, 'routes' => []],
+                ['type' => 'http', 'addr' => '127.0.0.1:8620', 'routes' => []],
+                ['type' => 'http', 'addr' => '127.0.0.1:8621', 'routes' => []],
             ],
         ]);
         $container = new Container();

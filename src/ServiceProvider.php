@@ -36,7 +36,11 @@ final class ServiceProvider implements Contract
         $this->servers = [];
         $this->workers = null;
         $config = $app->container()->make('config');
-        foreach (\Puff\Server\ServerConfig::all($config->get('server', [])) as $server) {
+        $workers = $config->get('workers', 1);
+        if (!\is_int($workers) || $workers < 1) {
+            throw new \InvalidArgumentException('Config workers must be a positive integer.');
+        }
+        foreach (\Puff\Server\ServerConfig::all($config->get('server', []), $workers) as $server) {
             if ($server['type'] !== 'http') {
                 continue;
             }

@@ -16,9 +16,8 @@ HTTP instances are read from the shared `config/server.php` list. Each item with
     'addr' => '127.0.0.1:8620',
     'routes' => [dirname(__DIR__) . '/app/routes.php'],
     'pipeline' => [],
-    'workers' => 1,
     'trusted_proxies' => [],
 ],
 ```
 
-Multiple HTTP listeners are supported. All HTTP items share one Application process group, so they must use the same `workers` value.
+Multiple HTTP listeners are supported. Their shared Worker count is configured by `workers` in `config/config.php`.
