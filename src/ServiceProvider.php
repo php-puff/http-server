@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace Puff\HttpServer;
 
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Server\RequestHandlerInterface;
 use Puff\Application\Application;
 use Puff\Application\Contract;
 use Puff\Http\Request;
@@ -26,6 +27,9 @@ final class ServiceProvider implements Contract
     /** @var list<Resource> */
     private array $resources = [];
 
+    /** @var array<string, array{dispatcher: Dispatcher, resource: Resource}> */
+    private array $httpHandlers = [];
+
     private ?int $workers = null;
 
     public function name(): string
@@ -38,25 +42,39 @@ final class ServiceProvider implements Contract
         $this->dispatchers = [];
         $this->servers = [];
         $this->resources = [];
+        $this->httpHandlers = [];
         $this->workers = null;
+        $app->container()->singletonIf(HandlerRegistry::class);
         $config = $app->container()->make('config');
         $workers = $config->get('workers', 1);
         if (!\is_int($workers) || $workers < 1) {
             throw new \InvalidArgumentException('Config workers must be a positive integer.');
         }
         foreach (\Puff\Server\ServerConfig::all($config->get('server', []), $workers) as $server) {
-            if ($server['type'] !== 'http') {
-                continue;
+            $type = \strtolower((string) $server['type']);
+            if ($type === 'http') {
+                $routes = \array_values(\array_filter((array) ($server['routes'] ?? []), \is_string(...)));
+                $pipeline = \array_values(\array_filter(
+                    (array) ($server['pipeline'] ?? []),
+                    static fn (mixed $item): bool => \is_string($item) || \is_object($item),
+                ));
+                $dispatcher = new Dispatcher($app, $routes, $pipeline);
+                $resource = new Resource($server);
+                $handler = new Handler($dispatcher);
+                $this->dispatchers[] = $dispatcher;
+                $this->resources[] = $resource;
+                $this->httpHandlers[$server['addr']] = ['dispatcher' => $dispatcher, 'resource' => $resource];
+            } else {
+                $factory = $app->container()->make(HandlerRegistry::class)->get($type);
+                if ($factory === null) {
+                    continue;
+                }
+                $handler = $factory->create($app, $server);
             }
-            $routes = \array_values(\array_filter((array) ($server['routes'] ?? []), \is_string(...)));
-            $pipeline = \array_values(\array_filter(
-                (array) ($server['pipeline'] ?? []),
-                static fn (mixed $item): bool => \is_string($item) || \is_object($item),
-            ));
-            $dispatcher = new Dispatcher($app, $routes, $pipeline);
-            $this->dispatchers[] = $dispatcher;
-            $this->resources[] = new Resource($server);
-            $this->servers[] = new Server(new Handler($dispatcher), $server);
+            if (!$handler instanceof RequestHandlerInterface) {
+                throw new \LogicException("HTTP server handler [{$type}] is invalid.");
+            }
+            $this->servers[] = new Server($handler, $server);
             $this->setWorkers($server['workers']);
         }
         if ($this->servers === []) {
@@ -110,12 +128,11 @@ final class ServiceProvider implements Contract
             return $this->resources[0]->handle($request) ?? $this->dispatcher()->handle($request);
         }
         $address = (string) \Puff\Server\Endpoint::parse($address);
-        foreach ($this->servers as $index => $server) {
-            if ($server->address() === $address) {
-                return $this->resources[$index]->handle($request) ?? $this->dispatchers[$index]->handle($request);
-            }
+        $handler = $this->httpHandlers[$address] ?? null;
+        if ($handler !== null) {
+            return $handler['resource']->handle($request) ?? $handler['dispatcher']->handle($request);
         }
-        throw new \LogicException("HTTP server [{$address}] is not configured.");
+        throw new \LogicException("HTTP server [{$address}] is not configured for PHP-FPM.");
     }
 
     public function dispatcher(): Dispatcher
