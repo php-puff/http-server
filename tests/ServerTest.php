@@ -26,8 +26,7 @@ final class ServerTest extends TestCase
         $server = new Server($this->handler());
 
         self::assertSame('127.0.0.1:8620', $server->address());
-        self::assertSame(['addr', 'url', 'connections'], \array_keys($server->info()));
-        self::assertSame('http://127.0.0.1:8620', $server->info()['url']);
+        self::assertSame(['addr', 'connections'], \array_keys($server->info()));
         self::assertSame('127.0.0.1:8620', $server->info()['addr']);
     }
 

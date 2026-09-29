@@ -16,8 +16,8 @@ use Puff\Application\Exception;
 use Puff\Config\Config;
 use Puff\Di\Container;
 use Puff\Http\Request;
-use Puff\Routing\Router;
 use Puff\HttpServer\ServiceProvider;
+use Puff\Routing\Router;
 
 final class ServiceProviderTest extends TestCase
 {
@@ -48,6 +48,10 @@ final class ServiceProviderTest extends TestCase
         self::assertSame(Router::class, $app->container()->getAlias('router'));
         self::assertSame(3, $web->workers());
         self::assertSame('127.0.0.1:8620', $web->info()['addr']);
+        self::assertSame([[
+            'type' => 'http',
+            'addr' => '127.0.0.1:8620',
+        ]], $web->info()['groups']);
     }
 
     public function testMissingRouteReturnsNotFoundResponse(): void
@@ -89,5 +93,9 @@ final class ServiceProviderTest extends TestCase
 
         self::assertSame(2, $web->workers());
         self::assertSame('127.0.0.1:8620, 127.0.0.1:8621', $web->info()['addr']);
+        self::assertSame([[
+            'type' => 'http',
+            'addr' => '127.0.0.1:8620, 127.0.0.1:8621',
+        ]], $web->info()['groups']);
     }
 }

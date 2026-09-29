@@ -27,6 +27,9 @@ final class ServiceProvider implements Contract
     /** @var list<Resource> */
     private array $resources = [];
 
+    /** @var list<string> */
+    private array $serverTypes = [];
+
     /** @var array<string, array{dispatcher: Dispatcher, resource: Resource}> */
     private array $httpHandlers = [];
 
@@ -42,6 +45,7 @@ final class ServiceProvider implements Contract
         $this->dispatchers = [];
         $this->servers = [];
         $this->resources = [];
+        $this->serverTypes = [];
         $this->httpHandlers = [];
         $this->workers = null;
         $app->container()->singletonIf(HandlerRegistry::class);
@@ -75,6 +79,7 @@ final class ServiceProvider implements Contract
                 throw new \LogicException("HTTP server handler [{$type}] is invalid.");
             }
             $this->servers[] = new Server($handler, $server);
+            $this->serverTypes[] = $type;
             $this->setWorkers($server['workers']);
         }
         if ($this->servers === []) {
@@ -101,15 +106,32 @@ final class ServiceProvider implements Contract
         return $this->workers ?? 1;
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @return array{
+     *     name: string,
+     *     addr: string,
+     *     workers: int,
+     *     groups: list<array{type: string, addr: string}>
+     * }
+     */
     public function info(): array
     {
-        $info = \array_map(static fn (Server $server): array => $server->info(), $this->servers);
+        $groups = [];
+        foreach ($this->servers as $index => $server) {
+            $info = $server->info();
+            $type = $this->serverTypes[$index] ?? 'http';
+            $groups[$type] ??= ['type' => $type, 'addr' => []];
+            $groups[$type]['addr'][] = $info['addr'];
+        }
+        $groups = \array_map(static fn (array $group): array => [
+            'type' => $group['type'],
+            'addr' => \implode(', ', $group['addr']),
+        ], \array_values($groups));
         return [
             'name' => $this->name(),
-            'addr' => \implode(', ', \array_column($info, 'addr')),
-            'url' => \implode(', ', \array_column($info, 'url')),
+            'addr' => \implode(', ', \array_column($groups, 'addr')),
             'workers' => $this->workers(),
+            'groups' => $groups,
         ];
     }
 

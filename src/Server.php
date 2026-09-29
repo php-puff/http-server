@@ -79,12 +79,11 @@ final class Server implements TcpInterface
         return $this->tcp->address();
     }
 
-    /** @return array{addr: string, url: string, connections: int} */
+    /** @return array{addr: string, connections: int} */
     public function info(): array
     {
         return [
             'addr' => $this->address(),
-            'url' => \sprintf('http://%s:%d', $this->tcp->host(), $this->tcp->port()),
             'connections' => $this->tcp->connectionCount(),
         ];
     }
